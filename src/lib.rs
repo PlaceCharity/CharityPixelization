@@ -185,6 +185,33 @@ pub enum SampleMode {
     Lanczos,
 }
 
+#[derive(Default, Deserialize, Serialize)]
+pub enum ProcessMode {
+    #[default]
+    None,
+    Bayer8x8,
+    Bayer4x4,
+    Bayer2x2,
+    Cluster8x8,
+    Cluster4x4,
+    FloydComponent,
+    FlotdDistributed
+}
+
+#[derive(Default, Deserialize, Serialize)]
+pub enum DistanceMode {
+    #[default]
+    KMeans,
+    RGB,
+    CIE76,
+    CIE94,
+    CIEDE200,
+    XYZ,
+    YCC,
+    YIQ,
+    YUV
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct I2PState {
     pub upscale: i32,
@@ -201,10 +228,9 @@ pub struct I2PState {
     pub offset_y: i32,
     pub image_outline: i32,
     pub image_inline: i32,
-    pub pixel_scale_mode: i32,
     pub pixel_sample_mode: SampleMode,
-    pub pixel_process_mode: i32,
-    pub pixel_distance_mode: i32,
+    pub pixel_process_mode: ProcessMode,
+    pub pixel_distance_mode: DistanceMode,
     pub image_out_width: i32,
     pub image_out_height: i32,
     pub image_out_swidth: i32,
@@ -234,10 +260,9 @@ impl Default for I2PState {
             offset_y: 0,
             image_outline: -1,
             image_inline: -1,
-            pixel_scale_mode: 0,
             pixel_sample_mode: Default::default(),
-            pixel_process_mode: 1,
-            pixel_distance_mode: 0,
+            pixel_process_mode: Default::default(),
+            pixel_distance_mode: Default::default(),
             image_out_width: 128,
             image_out_height: 128,
             image_out_swidth: 2,
@@ -640,67 +665,80 @@ fn dither_image(
     width: usize,
     height: usize,
 ) {
-    if state.pixel_distance_mode == 8 {
-        match state.pixel_process_mode {
-            1 => dither_threshold_apply(
-                state,
-                input,
-                &mut output.data,
-                width,
-                height,
-                &DITHER_THRESHOLD_BAYER8X8,
-                3,
-            ),
-            2 => dither_threshold_apply(
-                state,
-                input,
-                &mut output.data,
-                width,
-                height,
-                &DITHER_THRESHOLD_BAYER4X4,
-                2,
-            ),
-            3 => dither_threshold_apply(
-                state,
-                input,
-                &mut output.data,
-                width,
-                height,
-                &DITHER_THRESHOLD_BAYER2X2,
-                1,
-            ),
-            4 => dither_threshold_apply(
-                state,
-                input,
-                &mut output.data,
-                width,
-                height,
-                &DITHER_THRESHOLD_CLUSTER8X8,
-                3,
-            ),
-            5 => dither_threshold_apply(
-                state,
-                input,
-                &mut output.data,
-                width,
-                height,
-                &DITHER_THRESHOLD_CLUSTER4X4,
-                2,
-            ),
-            0 | 6 | 7 => dither_none_apply(state, input, &mut output.data, width, height),
-            _ => {}
+    match state.pixel_distance_mode {
+        DistanceMode::KMeans => {
+            dither_kmeans(state, input, output, width, height);
         }
+        DistanceMode::RGB => todo!(),
+        DistanceMode::CIE76 => todo!(),
+        DistanceMode::CIE94 => todo!(),
+        DistanceMode::CIEDE200 => todo!(),
+        DistanceMode::XYZ => todo!(),
+        DistanceMode::YCC => todo!(),
+        DistanceMode::YIQ => todo!(),
+        DistanceMode::YUV => todo!(),
+    }
+}
 
-        state.quant_k = state.palette.len() as i32;
-        let temp = output.clone();
-        quant_compute_kmeans(state, &temp, 1);
+fn dither_kmeans(state: &mut I2PState, input: Vec<palette::Alpha<palette::rgb::Rgb<palette::rgb::Rgb, u8>, u8>>, output: &mut Sprite, width: usize, height: usize) {
+    match state.pixel_process_mode {
+        ProcessMode::Bayer8x8 => dither_threshold_apply(
+            state,
+            input,
+            &mut output.data,
+            width,
+            height,
+            &DITHER_THRESHOLD_BAYER8X8,
+            3,
+        ),
+        ProcessMode::Bayer4x4 => dither_threshold_apply(
+            state,
+            input,
+            &mut output.data,
+            width,
+            height,
+            &DITHER_THRESHOLD_BAYER4X4,
+            2,
+        ),
+        ProcessMode::Bayer2x2 => dither_threshold_apply(
+            state,
+            input,
+            &mut output.data,
+            width,
+            height,
+            &DITHER_THRESHOLD_BAYER2X2,
+            1,
+        ),
+        ProcessMode::Cluster8x8 => dither_threshold_apply(
+            state,
+            input,
+            &mut output.data,
+            width,
+            height,
+            &DITHER_THRESHOLD_CLUSTER8X8,
+            3,
+        ),
+        ProcessMode::Cluster4x4 => dither_threshold_apply(
+            state,
+            input,
+            &mut output.data,
+            width,
+            height,
+            &DITHER_THRESHOLD_CLUSTER4X4,
+            2,
+        ),
+        ProcessMode::None | ProcessMode::FlotdDistributed | ProcessMode::FloydComponent => dither_none_apply(state, input, &mut output.data, width, height),
+    }
 
-        for i in 0..width * height {
-            if output.data[i].alpha == 0 {
-                output.data[i] = Default::default();
-            } else {
-                output.data[i] = state.palette[state.quant_assignment[i] as usize];
-            }
+    state.quant_k = state.palette.len() as i32;
+    let temp = output.clone();
+    quant_compute_kmeans(state, &temp, 1);
+
+    for i in 0..width * height {
+        if output.data[i].alpha == 0 {
+            output.data[i] = Default::default();
+        } else {
+            output.data[i] = state.palette[state.quant_assignment[i] as usize];
         }
     }
 }
