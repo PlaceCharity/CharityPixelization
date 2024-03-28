@@ -1,10 +1,10 @@
-use std::{default, f64::consts::PI, vec};
+use std::{f64::consts::PI, vec};
 
 use palette::{rgb::Rgba, FromColor, Hsva, Srgb};
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 
-const dither_threshold_bayer8x8: [f32; 64] = [
+const DITHER_THRESHOLD_BAYER8X8: [f32; 64] = [
     0.0 / 64.0,
     32.0 / 64.0,
     8.0 / 64.0,
@@ -70,7 +70,7 @@ const dither_threshold_bayer8x8: [f32; 64] = [
     53.0 / 64.0,
     21.0 / 64.0,
 ];
-const dither_threshold_bayer4x4: [f32; 16] = [
+const DITHER_THRESHOLD_BAYER4X4: [f32; 16] = [
     0.0 / 16.0,
     8.0 / 16.0,
     2.0 / 16.0,
@@ -88,8 +88,8 @@ const dither_threshold_bayer4x4: [f32; 16] = [
     13.0 / 16.0,
     5.0 / 16.0,
 ];
-const dither_threshold_bayer2x2: [f32; 4] = [0.0 / 4.0, 2.0 / 4.0, 3.0 / 4.0, 1.0 / 4.0];
-const dither_threshold_cluster8x8: [f32; 64] = [
+const DITHER_THRESHOLD_BAYER2X2: [f32; 4] = [0.0 / 4.0, 2.0 / 4.0, 3.0 / 4.0, 1.0 / 4.0];
+const DITHER_THRESHOLD_CLUSTER8X8: [f32; 64] = [
     24.0 / 64.0,
     10.0 / 64.0,
     12.0 / 64.0,
@@ -155,7 +155,7 @@ const dither_threshold_cluster8x8: [f32; 64] = [
     19.0 / 64.0,
     29.0 / 64.0,
 ];
-const dither_threshold_cluster4x4: [f32; 16] = [
+const DITHER_THRESHOLD_CLUSTER4X4: [f32; 16] = [
     12.0 / 16.0,
     5.0 / 16.0,
     6.0 / 16.0,
@@ -648,7 +648,7 @@ fn dither_image(
                 &mut output.data,
                 width,
                 height,
-                &dither_threshold_bayer8x8,
+                &DITHER_THRESHOLD_BAYER8X8,
                 3,
             ),
             2 => dither_threshold_apply(
@@ -657,7 +657,7 @@ fn dither_image(
                 &mut output.data,
                 width,
                 height,
-                &dither_threshold_bayer4x4,
+                &DITHER_THRESHOLD_BAYER4X4,
                 2,
             ),
             3 => dither_threshold_apply(
@@ -666,7 +666,7 @@ fn dither_image(
                 &mut output.data,
                 width,
                 height,
-                &dither_threshold_bayer2x2,
+                &DITHER_THRESHOLD_BAYER2X2,
                 1,
             ),
             4 => dither_threshold_apply(
@@ -675,7 +675,7 @@ fn dither_image(
                 &mut output.data,
                 width,
                 height,
-                &dither_threshold_cluster8x8,
+                &DITHER_THRESHOLD_CLUSTER8X8,
                 3,
             ),
             5 => dither_threshold_apply(
@@ -684,7 +684,7 @@ fn dither_image(
                 &mut output.data,
                 width,
                 height,
-                &dither_threshold_cluster4x4,
+                &DITHER_THRESHOLD_CLUSTER4X4,
                 2,
             ),
             0 | 6 | 7 => dither_none_apply(state, input, &mut output.data, width, height),
@@ -709,8 +709,8 @@ fn dither_none_apply(
     state: &mut I2PState,
     input: Vec<Color>,
     output: &mut [Color],
-    width: usize,
-    height: usize,
+    _width: usize,
+    _height: usize,
 ) {
     for (cin, output) in input.iter().zip(output) {
             if cin.alpha < state.alpha_threshold as u8 {
@@ -771,9 +771,9 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
     let mut iter = 0;
     let max_iter = 16;
     let previous_variance = vec![1.0; state.quant_k as usize];
-    let mut variance: f64 = 0.0;
-    let mut delta = 0.0;
-    let mut delta_max: f64 = 0.0;
+    let mut variance: f64;
+    let mut delta: f64;
+    let mut delta_max: f64;
     let threshold = 0.00005;
 
     loop {
@@ -817,7 +817,7 @@ fn quant_colors_variance(color_list: &[Color]) -> f64 {
 
 fn quant_nearest_color_idx(state: &I2PState, color: Color, color_list: &[Color]) -> i32 {
     let mut dist_min = 4095.0;
-    let mut dist = 0.0;
+    let mut dist: f64;
     let mut idx = 0;
 
     for i in 0..state.quant_k {
