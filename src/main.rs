@@ -1,5 +1,5 @@
 use image::{GenericImageView, ImageBuffer, Rgba};
-use softlk_rs::{process_image, Color, I2PState, Sprite};
+use charity_pixelization::{process_image, Color, I2PState, Sprite};
 
 fn main() {
     let palette = [

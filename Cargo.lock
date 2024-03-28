@@ -150,6 +150,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "charity_pixelization"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "palette",
+ "rand",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -863,17 +874,6 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
-
-[[package]]
-name = "softlk-rs"
-version = "0.1.0"
-dependencies = [
- "image",
- "palette",
- "rand",
- "serde",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "spin"
