@@ -770,14 +770,14 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
     state.quant_assignment.resize(data.width * data.height, 0);
     let mut iter = 0;
     let max_iter = 16;
-    let previous_variance = vec![1.0; state.quant_k as usize];
+    let mut previous_variance = vec![1.0; state.quant_k as usize];
     let mut variance: f64;
     let mut delta: f64;
     let mut delta_max: f64;
     let threshold = 0.00005;
 
     loop {
-        quant_get_cluster_centroid(state, data, pal_in, 1 << (state.palette_weight));
+        quant_get_cluster_centroid(state, data, pal_in, 1 << state.palette_weight);
         state.quant_cluster_list.shrink_to(0);
         state.quant_cluster_list.resize(state.quant_k as usize, Default::default());
         for i in 0..data.width * data.height {
@@ -792,6 +792,7 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
             variance = quant_colors_variance(&state.quant_cluster_list[i as usize]);
             delta = (previous_variance[i as usize] - variance).abs();
             delta_max = delta_max.max(delta);
+            previous_variance[i as usize] = variance;
         }
 
         iter += 1;
