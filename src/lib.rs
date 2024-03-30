@@ -239,7 +239,7 @@ pub struct I2PState {
     pub palette: Vec<Color>,
     pub quant_cluster_list: Vec<Vec<Color>>,
     pub quant_centroid_list: Vec<Color>,
-    pub quant_assignment: Vec<i32>,
+    pub quant_assignment: Vec<usize>,
     pub quant_k: i32,
 }
 
@@ -300,11 +300,11 @@ impl Sprite {
 
 pub fn process_image(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
     let mut temp = sample_image(s, input, output.width, output.height);
-    let gamma_factor = s.img_gamma as f32 / 100.0;
+    let gamma_factor = s.img_gamma as f64 / 100.0;
     let contrast_factor =
-        (259.0 * (255.0 + s.contrast as f32)) / (255.0 * (259.0 - s.contrast as f32));
-    let saturation_factor = s.saturation as f32 / 100.0;
-    let brightness_factor = s.brightness as f32 / 100.0;
+        (259.0 * (255.0 + s.contrast as f64)) / (255.0 * (259.0 - s.contrast as f64));
+    let saturation_factor = s.saturation as f64 / 100.0;
+    let brightness_factor = s.brightness as f64 / 100.0;
 
     let t = (1.0 - contrast_factor) / 2.0;
     let sr = (1.0 - saturation_factor) * 0.3086;
@@ -339,20 +339,20 @@ pub fn process_image(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
                 input = Rgba::from_color(hsv).into_format();
             }
 
-            let r = input.red as f32;
-            let g = input.green as f32;
-            let b = input.blue as f32;
+            let r = input.red as f64;
+            let g = input.green as f64;
+            let b = input.blue as f64;
             input.red = 0x0.max(0xff.min(((rr * r) + (gr * g) + (br * b) + wr) as u8));
             input.green = 0x0.max(0xff.min(((rg * r) + (gg * g) + (bg * b) + wg) as u8));
             input.blue = 0x0.max(0xff.min(((rb * r) + (gb * g) + (bb * b) + wb) as u8));
 
             if s.img_gamma != 100 {
                 input.red = 0x0
-                    .max(0xff.min((255.0 * (input.red as f32 / 255.0).powf(gamma_factor)) as u8));
+                    .max(0xff.min((255.0 * (input.red as f64 / 255.0).powf(gamma_factor)) as u8));
                 input.green = 0x0
-                    .max(0xff.min((255.0 * (input.green as f32 / 255.0).powf(gamma_factor)) as u8));
+                    .max(0xff.min((255.0 * (input.green as f64 / 255.0).powf(gamma_factor)) as u8));
                 input.blue = 0x0
-                    .max(0xff.min((255.0 * (input.blue as f32 / 255.0).powf(gamma_factor)) as u8));
+                    .max(0xff.min((255.0 * (input.blue as f64 / 255.0).powf(gamma_factor)) as u8));
             }
 
             input.alpha = a;
@@ -584,7 +584,7 @@ fn cubic_hermite(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
    let c_ = -a / 2.0 + c / 2.0;
    let d_ = b;
 
-   return a_ * t * t * t + b_ * t * t + c_ * t + d_;
+   a_ * t * t * t + b_ * t * t + c_ * t + d_
 }
 
 fn sample_lanczos(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec<Color> {
@@ -680,7 +680,7 @@ fn dither_image(
     }
 }
 
-fn dither_kmeans(state: &mut I2PState, input: Vec<palette::Alpha<palette::rgb::Rgb<palette::rgb::Rgb, u8>, u8>>, output: &mut Sprite, width: usize, height: usize) {
+fn dither_kmeans(state: &mut I2PState, input: Vec<Color>, output: &mut Sprite, width: usize, height: usize) {
     match state.pixel_process_mode {
         ProcessMode::Bayer8x8 => dither_threshold_apply(
             state,
@@ -738,7 +738,7 @@ fn dither_kmeans(state: &mut I2PState, input: Vec<palette::Alpha<palette::rgb::R
         if output.data[i].alpha == 0 {
             output.data[i] = Default::default();
         } else {
-            output.data[i] = state.palette[state.quant_assignment[i] as usize];
+            output.data[i] = state.palette[state.quant_assignment[i]];
         }
     }
 }
@@ -811,7 +811,7 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
     let mut previous_variance = vec![1.0; state.quant_k as usize];
     let mut variance: f64;
     let mut delta: f64;
-    let mut delta_max: f64;
+    let mut delta_max: f64 = 0.0;
     let threshold = 0.00005;
 
     loop {
@@ -821,16 +821,16 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
         for i in 0..data.width * data.height {
             let color = data.data[i];
             state.quant_assignment[i] =
-                quant_nearest_color_idx(state, color, &state.quant_centroid_list);
-            state.quant_cluster_list[state.quant_assignment[i] as usize].push(color);
+                quant_nearest_color_idx(color, &state.quant_centroid_list);
+            state.quant_cluster_list[state.quant_assignment[i]].push(color);
         }
 
-        delta_max = 0.0;
+
         for i in 0..state.quant_k {
-            variance = quant_colors_variance(&state.quant_cluster_list[i as usize]);
-            delta = (previous_variance[i as usize] - variance).abs();
-            delta_max = delta_max.max(delta);
-            previous_variance[i as usize] = variance;
+             variance = quant_colors_variance(&state.quant_cluster_list[i as usize]);
+             delta = (previous_variance[i as usize] - variance).abs();
+             delta_max = delta_max.max(delta);
+             previous_variance[i as usize] = variance;
         }
 
         iter += 1;
@@ -842,11 +842,11 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
 
 fn quant_colors_variance(color_list: &[Color]) -> f64 {
     let length = color_list.len();
-    let mean = quant_colors_mean(color_list, Color::default(), 0);
+    let mean = quant_colors_mean(color_list, Color::new(0, 0, 0, 0), 0);
     let dist_sum: f64 = color_list
         .iter()
         .map(|c| {
-            let dist = quant_distance(&c, mean);
+            let dist = quant_distance(*c, mean);
             dist * dist
         })
         .sum();
@@ -854,13 +854,13 @@ fn quant_colors_variance(color_list: &[Color]) -> f64 {
     dist_sum / length as f64
 }
 
-fn quant_nearest_color_idx(state: &I2PState, color: Color, color_list: &[Color]) -> i32 {
-    let mut dist_min = 4095.0;
+fn quant_nearest_color_idx(color: Color, color_list: &[Color]) -> usize {
+    let mut dist_min = f64::MAX;
     let mut dist: f64;
     let mut idx = 0;
 
-    for i in 0..state.quant_k {
-        dist = quant_distance(&color, color_list[i as usize]);
+    for (i, list_col) in color_list.iter().enumerate() {
+        dist = quant_distance(color, *list_col);
         if dist < dist_min {
             dist_min = dist;
             idx = i;
@@ -870,7 +870,7 @@ fn quant_nearest_color_idx(state: &I2PState, color: Color, color_list: &[Color])
     idx
 }
 
-fn quant_distance(color0: &Color, color1: Color) -> f64 {
+fn quant_distance(color0: Color, color1: Color) -> f64 {
     let mr = 0.5 * (color0.red as f64 + color1.red as f64);
     let dr = color0.red as f64 - color1.red as f64;
     let dg = color0.green as f64 - color1.green as f64;
@@ -898,7 +898,7 @@ fn quant_get_cluster_centroid(
                 );
             } else {
                 state.quant_centroid_list[i as usize] =
-                    quant_colors_mean(&state.quant_cluster_list[i as usize], Default::default(), 0);
+                    quant_colors_mean(&state.quant_cluster_list[i as usize], Color::new(0, 0, 0, 0), 0);
             }
         } else if pal_in != 0 {
             state.quant_centroid_list[i as usize] = state.palette[i as usize];
@@ -924,7 +924,7 @@ fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) ->
     for color in color_list {
         r += color.red as i32;
         g += color.green as i32;
-        b += color.green as i32;
+        b += color.blue as i32;
     }
 
     let mut weight_color = palette_weight;
@@ -942,5 +942,5 @@ fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) ->
         b /= length;
     }
 
-    Color::new(r as u8, g as u8, b as u8, 255)
+    Color::new(r as u8, g as u8, b as u8, 0)
 }
