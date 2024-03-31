@@ -1,6 +1,5 @@
-use charity_pixelization::{process_image, Color, I2PState, Sprite};
+use charity_pixelization::{process_sprite, Color, I2PState, Sprite};
 use image::{GenericImageView, ImageBuffer, Rgba};
-use stopwatch::Stopwatch;
 
 fn main() {
     let palette = [
@@ -39,7 +38,8 @@ fn main() {
     ];
     let mut state = I2PState {
         pixel_distance_mode: charity_pixelization::DistanceMode::OKLab,
-        palette: palette.iter().map(|c| c.parse().unwrap()).collect(),
+        pixel_dither_mode: charity_pixelization::DitherMode::Bayer8x8,
+        palette: &palette.iter().map(|c| c.parse().unwrap()).collect::<Vec<Color>>(),
         ..Default::default()
     };
     let image = image::open("lenna.png").unwrap();
@@ -57,9 +57,7 @@ fn main() {
         );
     }
     let input = output.clone();
-    let stopwatch = Stopwatch::start_new();
-    process_image(&mut state, &input, &mut output);
-    println!("processing took {:?}", stopwatch.elapsed());
+    process_sprite(&mut state, &input, &mut output);
 
     let mut imgbuf: ImageBuffer<Rgba<u8>, Vec<_>> =
         ImageBuffer::new(output.width as u32, output.height as u32);

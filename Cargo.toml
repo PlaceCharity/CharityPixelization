@@ -6,14 +6,18 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "lib"]
 
+[features]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-rayon"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 image = "0.25.0"
 ordered-float = "4.2.0"
-palette = { version = "0.7.5", features = ["serializing"] }
+palette = "0.7.5"
 rand = "0.8.5"
+getrandom = {version = "0.2", features = ["js"]}
 rayon = "1.10.0"
-serde = { version = "1.0.197", features = ["serde_derive"] }
-stopwatch = "0.0.7"
-wasm-bindgen = "0.2.92"
+wasm-bindgen = {version = "0.2.92", optional = true}
+wasm-bindgen-rayon = {version = "1.2.1", optional = true}
+anyhow = "1.0.81"

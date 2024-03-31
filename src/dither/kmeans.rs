@@ -62,59 +62,50 @@ pub(super) fn dither_kmeans(
             2,
         ),
         DitherMode::None | DitherMode::FloydDistributed | DitherMode::FloydComponent => {
-            dither_none_apply(state, input, &mut output.data, width, height)
+            dither_none_apply(state, input, &mut output.data)
         }
     }
 
-    state.quant_k = state.palette.len() as i32;
     let temp = output.clone();
-    quant_compute_kmeans(state, &temp, 1);
+    let assignments = quant_compute_kmeans(state, &temp, 1);
 
-    for i in 0..width * height {
-        if output.data[i].alpha == 0 {
-            output.data[i] = Default::default();
-        } else {
-            output.data[i] = state.palette[state.quant_assignment[i]];
+   for (col, assignment) in output.data.iter_mut().zip(assignments) {
+        if col.alpha == 0 {
+            continue;
         }
-    }
+
+        *col = state.palette[assignment];
+   }
 }
 
-fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
-    state.quant_cluster_list.shrink_to(0);
-    state
-        .quant_cluster_list
-        .resize(state.quant_k as usize, Default::default());
-    state.quant_centroid_list.shrink_to(0);
-    state
-        .quant_centroid_list
-        .resize(state.quant_k as usize, Default::default());
-    state.quant_assignment.shrink_to(0);
-    state.quant_assignment.resize(data.width * data.height, 0);
+fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) -> Vec<usize> {
+    let mut quant_cluster_list = vec![Vec::default(); state.palette.len()];
+    let mut quant_centroid_list = vec![Color::default(); state.palette.len()];
+    let mut quant_assignment = vec![0; data.width * data.height];
     let mut iter = 0;
     let max_iter = 16;
-    let mut previous_variance = vec![1.0; state.quant_k as usize];
+    let mut previous_variance = vec![1.0; state.palette.len()];
     let mut variance: f64;
     let mut delta: f64;
     let mut delta_max: f64 = 0.0;
     let threshold = 0.00005;
 
     loop {
-        quant_get_cluster_centroid(state, data, pal_in, 1 << state.palette_weight);
-        state.quant_cluster_list.shrink_to(0);
-        state
-            .quant_cluster_list
-            .resize(state.quant_k as usize, Default::default());
+        quant_get_cluster_centroid(state, &quant_cluster_list, &mut quant_centroid_list, data, pal_in, 1 << state.palette_weight);
+        quant_cluster_list.shrink_to(0);
+        quant_cluster_list
+            .resize(state.palette.len(), Default::default());
         for i in 0..data.width * data.height {
             let color = data.data[i];
-            state.quant_assignment[i] = quant_nearest_color_idx(color, &state.quant_centroid_list);
-            state.quant_cluster_list[state.quant_assignment[i]].push(color);
+            quant_assignment[i] = quant_nearest_color_idx(color, &quant_centroid_list);
+            quant_cluster_list[quant_assignment[i]].push(color);
         }
 
-        for i in 0..state.quant_k {
-            variance = quant_colors_variance(&state.quant_cluster_list[i as usize]);
-            delta = (previous_variance[i as usize] - variance).abs();
+        for i in 0..state.palette.len() {
+            variance = quant_colors_variance(&quant_cluster_list[i]);
+            delta = (previous_variance[i] - variance).abs();
             delta_max = delta_max.max(delta);
-            previous_variance[i as usize] = variance;
+            previous_variance[i] = variance;
         }
 
         iter += 1;
@@ -122,6 +113,8 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) {
             break;
         }
     }
+
+    quant_assignment
 }
 
 fn quant_colors_variance(color_list: &[Color]) -> f64 {
@@ -168,29 +161,31 @@ fn quant_distance(color0: Color, color1: Color) -> f64 {
 
 fn quant_get_cluster_centroid(
     state: &mut I2PState,
+    quant_cluster_list: &[Vec<Color>],
+    quant_centroid_list: &mut [Color],
     data: &Sprite,
     pal_in: i32,
     palette_weight: i32,
 ) {
-    for i in 0..state.quant_k {
-        if !state.quant_cluster_list[i as usize].is_empty() {
+    for i in 0..state.palette.len() {
+        if !quant_cluster_list[i].is_empty() {
             if pal_in != 0 {
-                state.quant_centroid_list[i as usize] = quant_colors_mean(
-                    &state.quant_cluster_list[i as usize],
-                    state.palette[i as usize],
+                quant_centroid_list[i] = quant_colors_mean(
+                    &quant_cluster_list[i],
+                    state.palette[i],
                     palette_weight,
                 );
             } else {
-                state.quant_centroid_list[i as usize] = quant_colors_mean(
-                    &state.quant_cluster_list[i as usize],
+                quant_centroid_list[i] = quant_colors_mean(
+                    &quant_cluster_list[i],
                     Color::new(0, 0, 0, 0),
                     0,
                 );
             }
         } else if pal_in != 0 {
-            state.quant_centroid_list[i as usize] = state.palette[i as usize];
+            quant_centroid_list[i] = state.palette[i];
         } else {
-            state.quant_centroid_list[i as usize] = quant_pick_random_color(data);
+            quant_centroid_list[i] = quant_pick_random_color(data);
         }
     }
 }

@@ -1,10 +1,8 @@
 use std::f64::consts::PI;
 
-use serde::{Deserialize, Serialize};
-
 use crate::{sprite::Sprite, Color, I2PState};
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default)]
 pub enum SampleMode {
     #[default]
     Round,

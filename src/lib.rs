@@ -1,16 +1,23 @@
+use std::io::{BufWriter, Cursor};
+
+use anyhow::Result;
 use dither::dither_image;
 pub use dither::{DistanceMode, DitherMode};
-use palette::{rgb::Rgba, FromColor, Hsva, Srgb};
+use image::{load_from_memory, write_buffer_with_format, ColorType, GenericImageView, ImageBuffer};
+use palette::{rgb::{FromHexError, Rgba}, FromColor, Hsva, Srgb};
 use sampling::{sample_image, SampleMode};
-use serde::{Deserialize, Serialize};
 pub use sprite::Sprite;
 
 mod dither;
 mod sampling;
 mod sprite;
 
-#[derive(Deserialize, Serialize)]
-pub struct I2PState {
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+#[cfg(feature = "wasm")]
+pub use wasm_bindgen_rayon::init_thread_pool;
+
+pub struct I2PState<'a> {
     pub upscale: i32,
     pub brightness: i32,
     pub contrast: i32,
@@ -33,14 +40,10 @@ pub struct I2PState {
     pub image_out_swidth: i32,
     pub image_out_sheight: i32,
     pub palette_weight: i32,
-    pub palette: Vec<Color>,
-    pub quant_cluster_list: Vec<Vec<Color>>,
-    pub quant_centroid_list: Vec<Color>,
-    pub quant_assignment: Vec<usize>,
-    pub quant_k: i32,
+    pub palette: &'a [Color],
 }
 
-impl Default for I2PState {
+impl Default for I2PState<'_> {
     fn default() -> Self {
         Self {
             upscale: 1,
@@ -66,18 +69,68 @@ impl Default for I2PState {
             image_out_sheight: 2,
             palette_weight: 2,
             palette: Default::default(),
-            quant_cluster_list: Default::default(),
-            quant_centroid_list: Default::default(),
-            quant_assignment: Default::default(),
-            quant_k: 16,
         }
     }
 }
 
+
+
 pub type Color = Rgba<Srgb, u8>;
 pub struct Components(f64, f64, f64);
 
-pub fn process_image(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn process_image_wasm(input: &[u8], palette: Vec<String>) -> Result<Vec<u8>, JsError> {
+    let result = process_image(input, &palette);
+    result.map_err(|e| JsError::new(&format!("{e}")))
+} 
+
+pub fn process_image(input: &[u8], palette: &[String]) -> Result<Vec<u8>> {
+    let image = load_from_memory(input)?;
+    let palette: Vec<Color> = palette.iter().map(|c| c.parse::<Color>()).collect::<Result<Vec<_>, FromHexError>>()?;
+
+    let mut state = I2PState {
+        pixel_distance_mode: crate::DistanceMode::OKLab,
+        pixel_dither_mode: crate::DitherMode::Bayer8x8,
+        palette: &palette,
+        ..Default::default()
+    };
+
+    let mut output = Sprite {
+        width: image.width() as usize,
+        height: image.height() as usize,
+        data: vec![Default::default(); image.width() as usize * image.height() as usize],
+    };
+    for (x, y, pixel) in image.pixels() {
+        let pixel = pixel.0;
+        output.set_pixel(
+            x as usize,
+            y as usize,
+            Color::new(pixel[0], pixel[1], pixel[2], pixel[3]),
+        );
+    }
+
+    let input = output.clone();
+    process_sprite(&mut state, &input, &mut output);
+
+    let mut imgbuf: ImageBuffer<image::Rgba<u8>, Vec<_>> =
+        ImageBuffer::new(output.width as u32, output.height as u32);
+    for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
+        let sprite_pixel = output.get_pixel(x as usize, y as usize).unwrap();
+        *pixel = image::Rgba([
+            sprite_pixel.red,
+            sprite_pixel.green,
+            sprite_pixel.blue,
+            sprite_pixel.alpha,
+        ]);
+    }
+
+    let mut output_image = Cursor::new(Vec::new());
+    write_buffer_with_format(&mut BufWriter::new(&mut output_image), &imgbuf, imgbuf.width(), imgbuf.height(), ColorType::Rgba8, image::ImageFormat::Png)?;
+    Ok(output_image.into_inner())
+}
+
+pub fn process_sprite(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
     let mut temp = sample_image(s, input, output.width, output.height);
     let gamma_factor = s.img_gamma as f64 / 100.0;
     let contrast_factor =
