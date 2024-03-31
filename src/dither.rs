@@ -201,6 +201,7 @@ pub enum DistanceMode {
     CIE76,
     CIE94,
     CIEDE2000,
+    CMC,
     XYZ,
     YCC,
     YIQ,
@@ -221,7 +222,7 @@ pub fn dither_image(
 
     let palette_components: Vec<Components> = match state.pixel_distance_mode {
         DistanceMode::RGB => state.palette.iter().map(color_to_rgb).collect(),
-        DistanceMode::CIE76 | DistanceMode::CIE94 | DistanceMode::CIEDE2000 => {
+        DistanceMode::CIE76 | DistanceMode::CIE94 | DistanceMode::CIEDE2000 | DistanceMode::CMC => {
             state.palette.iter().map(color_to_lab).collect()
         }
         DistanceMode::XYZ => state.palette.iter().map(color_to_xyz).collect(),
@@ -236,6 +237,7 @@ pub fn dither_image(
         DistanceMode::CIE76 => palette_find_closest(color_to_lab, color_dist2),
         DistanceMode::CIE94 => palette_find_closest(color_to_lab, cie94_color_dist2),
         DistanceMode::CIEDE2000 => palette_find_closest(color_to_lab, ciede2000_color_dist2),
+        DistanceMode::CMC => palette_find_closest(color_to_lab, cmc_color_dist2),
         DistanceMode::XYZ => palette_find_closest(color_to_xyz, color_dist2),
         DistanceMode::YCC => palette_find_closest(color_to_ycc, color_dist2),
         DistanceMode::YIQ => palette_find_closest(color_to_yiq, color_dist2),
@@ -361,6 +363,55 @@ fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64
    let sh = 1.0+0.015*cs_*t;
 
    (l/sl)*(l/sl)+(cs/sc)*(cs/sc)+(h/sh)*(h/sh)+rt*(cs/sc)*(h_/sh)
+}
+
+fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64
+{
+    let c1 = f64::sqrt(col0.1.powf(2.0) + col0.2.powf(2.0));
+    let c2 = f64::sqrt(col1.1.powf(2.0) + col1.2.powf(2.0));
+    let ff = f64::sqrt(c1.powf(4.0) / (c1.powf(4.0) + 1900.0));
+    let h1: f64;
+    let mut bias: f64 = 0.0;
+    if col0.1 >= 0.0 && col0.2 == 0.0 {
+        h1 = 0.0;
+    } else if col0.1 < 0.0 && col0.2 == 0.0 {
+        h1 = 180.0;
+    } else if col0.1 == 0.0 && col0.2 > 0.0 {
+        h1 = 90.0;
+    } else if col0.1 == 0.0 && col0.2 < 0.0 {
+        h1 = 270.0;
+    } else {
+        if col0.1 > 0.0 && col0.2 > 0.0 {
+            bias = 0.0;
+        }
+        if col0.1 < 0.0 {
+            bias = 180.0;
+        }
+        if col0.1 > 0.0 && col0.2 < 0.0 {
+            bias = 360.0;
+        }
+        h1 = (col0.2 / col0.1).atan().to_degrees() + bias;
+    }
+
+    let tt = if h1 < 164.0 || h1 > 345.0 {
+        0.36 + f64::abs(0.4 * f64::cos(35.0 + h1))
+    } else {
+        0.56 + f64::abs(0.2 * f64::cos(168.0 + h1))
+    };
+
+    let mut sl = if col0.0 < 16.0 {
+        0.511
+    } else {
+        (0.040975 * col0.0) / (1.0 + (0.01765 * col0.0))
+    };
+
+    let mut sc = ((0.0638 * c1) / (1.0 + (0.0131 * c1))) + 0.638;
+    let mut sh = ((ff * tt) + 1.0 - ff) * sc;
+    let dh = f64::sqrt((col1.1 - col0.1).powf(2.0) + (col1.2 - col0.2).powf(2.0) - (c2 - c1).powf(2.0));
+    sl = (col1.0 - col0.0) / (2.0 * sl);
+    sc = (c2 - c1) / (1.0 * sc);
+    sh = dh / sh;
+    f64::sqrt(sl.powf(2.0) + sc.powf(2.0) + sh.powf(2.0))
 }
 
 fn color_to_ycc(color: &Color) -> Components {
@@ -553,7 +604,7 @@ fn dither_threshold(
     palette_components: &[Components],
     closest: impl Fn(&[Color], &[Components], Color) -> Color + Sync,
     width: usize,
-    height: usize,
+    _height: usize,
     threshold: &[f32],
     dim: u8,
 ) {

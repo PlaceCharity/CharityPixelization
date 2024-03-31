@@ -38,7 +38,7 @@ fn main() {
         "#FFFFFFFF",
     ];
     let mut state = I2PState {
-        pixel_distance_mode: charity_pixelization::DistanceMode::CIEDE2000,
+        pixel_distance_mode: charity_pixelization::DistanceMode::CMC,
         palette: palette.iter().map(|c| c.parse().unwrap()).collect(),
         ..Default::default()
     };
