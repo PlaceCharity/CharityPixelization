@@ -208,6 +208,7 @@ pub enum DistanceMode {
     YCC,
     YIQ,
     YUV,
+    OKLab,
 }
 
 pub fn dither_image(
@@ -233,6 +234,7 @@ pub fn dither_image(
         DistanceMode::YCC => state.palette.iter().map(color_to_ycc).collect(),
         DistanceMode::YIQ => state.palette.iter().map(color_to_yiq).collect(),
         DistanceMode::YUV => state.palette.iter().map(color_to_yuv).collect(),
+        DistanceMode::OKLab => state.palette.iter().map(color_to_oklab).collect(),
         _ => unreachable!(),
     };
 
@@ -248,6 +250,7 @@ pub fn dither_image(
         DistanceMode::YCC => palette_find_closest(color_to_ycc, color_dist2),
         DistanceMode::YIQ => palette_find_closest(color_to_yiq, color_dist2),
         DistanceMode::YUV => palette_find_closest(color_to_yuv, color_dist2),
+        DistanceMode::OKLab => palette_find_closest(color_to_oklab, color_dist2),
         DistanceMode::KMeans => unreachable!(),
     };
 
@@ -438,6 +441,42 @@ fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64
     sc = (c2 - c1) / (1.0 * sc);
     sh = dh / sh;
     sl.powf(2.0) + sc.powf(2.0) + sh.powf(2.0)
+}
+
+fn color_to_oklab(color: &Color) -> Components {
+    let r = color.red as f64 / 255.0;
+    let g = color.green as f64 / 255.0;
+    let b = color.blue as f64 / 255.0;
+
+    let lr = if r >= 0.04045 {
+        ((r + 0.055) / 1.055).powf(2.4)
+    } else {
+        r / 12.92
+    };
+    let lg = if g >= 0.04045 {
+        ((g + 0.055) / 1.055).powf(2.4)
+    } else {
+        g / 12.92
+    };
+    let lb = if b >= 0.04045 {
+        ((b + 0.055) / 1.055).powf(2.4)
+    } else {
+        b / 12.92
+    };
+
+    let l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+	let m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+	let s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+
+    let cbrt_l = l.cbrt();
+    let cbrt_m = m.cbrt();
+    let cbrt_s = s.cbrt();
+
+    Components(
+        0.2104542553 * cbrt_l + 0.7936177850 * cbrt_m - 0.0040720468 * cbrt_s,
+        1.9779984951 * cbrt_l - 2.4285922050 * cbrt_m + 0.4505937099 * cbrt_s,
+        0.0259040371 * cbrt_l + 0.7827717662 * cbrt_m - 0.8086757660 * cbrt_s,
+    )
 }
 
 fn color_to_ycc(color: &Color) -> Components {
