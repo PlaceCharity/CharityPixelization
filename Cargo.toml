@@ -10,6 +10,7 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 image = "0.25.0"
+ordered-float = "4.2.0"
 palette = { version = "0.7.5", features = ["serializing"] }
 rand = "0.8.5"
 serde = { version = "1.0.197", features = ["serde_derive"] }

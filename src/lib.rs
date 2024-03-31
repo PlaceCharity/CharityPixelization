@@ -1,5 +1,5 @@
 use dither::dither_image;
-pub use dither::{DitherMode, ProcessMode};
+pub use dither::{DistanceMode, DitherMode};
 use palette::{rgb::Rgba, FromColor, Hsva, Srgb};
 use sampling::{sample_image, SampleMode};
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub struct I2PState {
     pub image_inline: i32,
     pub pixel_sample_mode: SampleMode,
     pub pixel_dither_mode: DitherMode,
-    pub pixel_process_mode: ProcessMode,
+    pub pixel_distance_mode: DistanceMode,
     pub image_out_width: i32,
     pub image_out_height: i32,
     pub image_out_swidth: i32,
@@ -59,7 +59,7 @@ impl Default for I2PState {
             image_inline: -1,
             pixel_sample_mode: Default::default(),
             pixel_dither_mode: Default::default(),
-            pixel_process_mode: Default::default(),
+            pixel_distance_mode: Default::default(),
             image_out_width: 128,
             image_out_height: 128,
             image_out_swidth: 2,
@@ -75,6 +75,7 @@ impl Default for I2PState {
 }
 
 pub type Color = Rgba<Srgb, u8>;
+pub struct Components(f64, f64, f64);
 
 pub fn process_image(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
     let mut temp = sample_image(s, input, output.width, output.height);
