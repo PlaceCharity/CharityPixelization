@@ -198,6 +198,7 @@ pub enum DistanceMode {
     #[default]
     KMeans,
     RGB,
+    LWRGB,
     CIE76,
     CIE94,
     CIEDE2000,
@@ -221,7 +222,7 @@ pub fn dither_image(
     }
 
     let palette_components: Vec<Components> = match state.pixel_distance_mode {
-        DistanceMode::RGB => state.palette.iter().map(color_to_rgb).collect(),
+        DistanceMode::RGB | DistanceMode::LWRGB => state.palette.iter().map(color_to_rgb).collect(),
         DistanceMode::CIE76 | DistanceMode::CIE94 | DistanceMode::CIEDE2000 | DistanceMode::CMC => {
             state.palette.iter().map(color_to_lab).collect()
         }
@@ -234,6 +235,7 @@ pub fn dither_image(
 
     let find_closest = match state.pixel_distance_mode {
         DistanceMode::RGB => palette_find_closest(color_to_rgb, color_dist2),
+        DistanceMode::LWRGB => palette_find_closest(color_to_rgb, lwrgb_color_dist2),
         DistanceMode::CIE76 => palette_find_closest(color_to_lab, color_dist2),
         DistanceMode::CIE94 => palette_find_closest(color_to_lab, cie94_color_dist2),
         DistanceMode::CIEDE2000 => palette_find_closest(color_to_lab, ciede2000_color_dist2),
@@ -273,10 +275,21 @@ fn palette_find_closest(conversion: impl Fn(&Color) -> Components + 'static + Sy
 
 fn color_dist2(a: &Components, b: &Components) -> f64 {
     let diff_0 = b.0-a.0;
-   let diff_1 = b.1-a.1;
-   let diff_2 = b.2-a.2;
+    let diff_1 = b.1-a.1;
+    let diff_2 = b.2-a.2;
+    
+    diff_0*diff_0+diff_1*diff_1+diff_2*diff_2
+}
 
-   diff_0*diff_0+diff_1*diff_1+diff_2*diff_2
+fn lwrgb_color_dist2(a: &Components, b: &Components) -> f64 {
+    let dr = b.0-a.0;
+    let dg = b.1-a.1;
+    let db = b.2-a.2;
+    let l1 = a.0 * 0.299 + a.1 * 0.587 + a.2 * 0.114;
+    let l2 = b.0 * 0.299 + b.1 * 0.587 + b.2 * 0.114;
+    let dl = l1 - l2;
+    
+    (dr * dr * 0.299 + dg * dg * 0.587 + db * db * 0.114) * 0.75 + dl * dl
 }
 
 fn cie94_color_dist2(col0: &Components, col1: &Components) -> f64
