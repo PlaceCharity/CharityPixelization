@@ -13,5 +13,7 @@ image = "0.25.0"
 ordered-float = "4.2.0"
 palette = { version = "0.7.5", features = ["serializing"] }
 rand = "0.8.5"
+rayon = "1.10.0"
 serde = { version = "1.0.197", features = ["serde_derive"] }
+stopwatch = "0.0.7"
 wasm-bindgen = "0.2.92"

@@ -1,6 +1,7 @@
 use std::f64::consts::{PI, TAU};
 
 use ordered_float::OrderedFloat;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{Color, Components, I2PState, Sprite};
@@ -254,7 +255,7 @@ pub fn dither_image(
     }
 }
 
-fn palette_find_closest(conversion: impl Fn(&Color) -> Components + 'static, distance: impl Fn(&Components, &Components) -> f64 + 'static) -> Box<dyn Fn(&[Color], &[Components], Color) -> Color> {
+fn palette_find_closest(conversion: impl Fn(&Color) -> Components + 'static + Sync, distance: impl Fn(&Components, &Components) -> f64 + 'static + Sync) -> Box<dyn Fn(&[Color], &[Components], Color) -> Color + Sync> {
     Box::new(move |palette: &[Color], palette_components: &[Components], color: Color| {
         if color.alpha == 0 {
             return palette[0];
@@ -276,90 +277,90 @@ fn color_dist2(a: &Components, b: &Components) -> f64 {
    diff_0*diff_0+diff_1*diff_1+diff_2*diff_2
 }
 
-fn cie94_color_dist2(c0: &Components, c1: &Components) -> f64
+fn cie94_color_dist2(col0: &Components, col1: &Components) -> f64
 {
-   let L = c0.0-c1.0;
-   let C1 = f64::sqrt(c0.1*c0.1+c0.2*c0.2);
-   let C2 = f64::sqrt(c1.1*c1.1+c1.2*c1.2);
-   let C = C1-C2;
-   let H = f64::sqrt((c0.1-c1.1)*(c0.1-c1.1)+(c0.2-c1.2)*(c0.2-c1.2)-C*C);
-   let r1 = L;
-   let r2 = C/(1.0+0.045*C1);
-   let r3 = H/(1.0+0.015*C1);
+   let l = col0.0-col1.0;
+   let c1 = f64::sqrt(col0.1*col0.1+col0.2*col0.2);
+   let c2 = f64::sqrt(col1.1*col1.1+col1.2*col1.2);
+   let c = c1-c2;
+   let h = f64::sqrt((col0.1-col1.1)*(col0.1-col1.1)+(col0.2-col1.2)*(col0.2-col1.2)-c*c);
+   let r1 = l;
+   let r2 = c/(1.0+0.045*c1);
+   let r3 = h/(1.0+0.015*c1);
 
-   return r1*r1+r2*r2+r3*r3;
+   r1*r1+r2*r2+r3*r3
 }
 
-fn ciede2000_color_dist2(c0: &Components, c1: &Components) -> f64
+fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64
 {
-   let C1 = f64::sqrt(c0.1*c0.1+c0.2*c0.2);
-   let C2 = f64::sqrt(c1.1*c1.1+c1.2*c1.2);
-   let C_ = (C1+C2)/2.0;
+   let c1 = f64::sqrt(col0.1*col0.1+col0.2*col0.2);
+   let c2 = f64::sqrt(col1.1*col1.1+col1.2*col1.2);
+   let c_ = (c1+c2)/2.0;
 
-   let C_p2 = C_.powf(7.0);
-   let mut v = 0.5*(1.0-f64::sqrt(C_p2/(C_p2+6103515625.0)));
-   let a1 = (1.0+v)*c0.1;
-   let a2 = (1.0+v)*c1.1;
+   let c_p2 = c_.powf(7.0);
+   let mut v = 0.5*(1.0-f64::sqrt(c_p2/(c_p2+6103515625.0)));
+   let a1 = (1.0+v)*col0.1;
+   let a2 = (1.0+v)*col1.1;
 
-   let Cs1 = f64::sqrt(a1*a1+c0.2*c0.2);
-   let Cs2 = f64::sqrt(a2*a2+c1.2*c1.2);
+   let cs1 = f64::sqrt(a1*a1+col0.2*col0.2);
+   let cs2 = f64::sqrt(a2*a2+col1.2*col1.2);
 
    let mut h1 = 0.0;
-   if(c0.2!=0.0||a1!=0.0)
+   if col0.2!=0.0||a1!=0.0
    {
-      h1 = c0.2.atan2(a1);
-      if(h1<0.0) {
+      h1 = col0.2.atan2(a1);
+      if h1<0.0 {
         h1+=TAU;
       }
    }
    let mut h2 = 0.0;
-   if(c1.2!=0.0||a2!=0.0)
+   if col1.2!=0.0||a2!=0.0
    {
-      h2 = c1.2.atan2(a2);
-      if(h2<0.0) {
+      h2 = col1.2.atan2(a2);
+      if h2<0.0 {
          h2+=TAU;
       }
    }
 
-   let L = c1.0-c0.0;
-   let Cs = Cs2-Cs1;
+   let l = col1.0-col0.0;
+   let cs = cs2-cs1;
    let mut h = 0.0;
-   if(Cs1*Cs2!=0.0)
+   if cs1*cs2!=0.0
    {
       h = h2-h1;
-      if(h < -PI) {
+      if h < -PI {
         h+=TAU;
       }
-      else if(h>PI) {
+      else if h>PI {
          h-=TAU;
       }
    }
-   let H = 2.0 * f64::sqrt(Cs1*Cs2)* f64::sin(h/2.0);
+   let h = 2.0 * f64::sqrt(cs1*cs2)* f64::sin(h/2.0);
 
-   let L_ = (c0.0+c1.0)/2.0;
-   let Cs_ = (Cs1+Cs2)/2.0;
-   let mut H_ = h1+h2;
-   if(Cs1*Cs2!=0.0)
+   let _l_ = (col0.0+col1.0)/2.0;
+   let cs_ = (cs1+cs2)/2.0;
+   let mut h_ = h1+h2;
+   if cs1*cs2!=0.0
    {
-      if(f64::abs(h1-h2)<=PI){
-         H_ = (h1+h2)/2.0;
-      } else if(h1+h2<TAU) {
-         H_ = (h1+h2+TAU)/2.0;
+      if f64::abs(h1-h2)<=PI {
+         h_ = (h1+h2)/2.0;
+      } else if h1+h2<TAU {
+         h_ = (h1+h2+TAU)/2.0;
       } else {
-        H_ = (h1+h2-TAU)/2.0;
+        h_ = (h1+h2-TAU)/2.0;
       }
    }
 
-   let T = 1.0-0.17*f64::cos(H_-30.0_f64.to_radians())+0.24 * f64::cos(2.0*H_)+0.32*f64::cos(3.0*H_+6.0_f64.to_radians())-0.2*f64::cos(4.0*H_-63.0_f64.to_radians());
-   v = 60.0_f64.to_radians()*f64::exp(-1.0*((H_-275.0_f64.to_radians())/25.0_f64.to_radians())*((H_-275.0_f64.to_radians())/25.0_f64.to_radians()));
-   let Cs_p2 = Cs_.powf(7.0);
-   let RC = 2.0*f64::sqrt(Cs_p2/(Cs_p2+6103515625.0));
-   let RT = -1.0*v.sin()*RC;
-   let SL = 1.0;
-   let SC = 1.0+0.045*Cs_;
-   let SH = 1.0+0.015*Cs_*T;
+   let t = 1.0-0.17*f64::cos(h_-30.0_f64.to_radians())+0.24 * f64::cos(2.0*h_)+0.32*f64::cos(3.0*h_+6.0_f64.to_radians())-0.2*f64::cos(4.0*h_-63.0_f64.to_radians());
+   v = 60.0_f64.to_radians()*f64::exp(-1.0*((h_-275.0_f64.to_radians())/25.0_f64.to_radians())*((h_-275.0_f64.to_radians())/25.0_f64.to_radians()));
+   let cs_p2 = cs_.powf(7.0);
+   let rc = 2.0*f64::sqrt(cs_p2/(cs_p2+6103515625.0));
+   let rt = -1.0*v.sin()*rc;
+   let sl = 1.0;
+   let sc = 1.0+0.045*cs_;
+   let sh = 1.0+0.015*cs_*t;
 
-   (L/SL)*(L/SL)+(Cs/SC)*(Cs/SC)+(H/SH)*(H/SH)+RT*(Cs/SC)*(H_/SH)
+   (l/sl)*(l/sl)+(cs/sc)*(cs/sc)+(h/sh)*(h/sh)+rt*(cs/sc)*(h_/sh)
 }
 
 fn color_to_ycc(color: &Color) -> Components {
@@ -550,7 +551,7 @@ fn dither_threshold(
     output: &mut [Color],
     palette: &[Color],
     palette_components: &[Components],
-    closest: impl Fn(&[Color], &[Components], Color) -> Color,
+    closest: impl Fn(&[Color], &[Components], Color) -> Color + Sync,
     width: usize,
     height: usize,
     threshold: &[f32],
@@ -558,12 +559,11 @@ fn dither_threshold(
 ) {
     let amount = state.dither_amount as f32 / 1000.0;
 
-    for y in 0..height {
-        for x in 0..width {
-            let input = input[y * width + x];
+    let result: Vec<Color> = input.par_iter().enumerate().map(|(i, input)| {
+        let x = i % width;
+        let y = i / width;
             if input.alpha < state.alpha_threshold as u8 {
-                output[y * width + x] = Default::default();
-                continue;
+                return Default::default();
             }
 
             let r#mod = (1 << dim) - 1;
@@ -580,7 +580,10 @@ fn dither_threshold(
                 )),
                 255,
             );
-            output[y * width + x] = closest(palette, palette_components, c);
-        }
+            closest(palette, palette_components, c)
+    }).collect();
+
+    for (output, col) in output.iter_mut().zip(result) {
+        *output = col;
     }
 }

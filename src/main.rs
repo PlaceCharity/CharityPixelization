@@ -1,5 +1,6 @@
 use charity_pixelization::{process_image, Color, I2PState, Sprite};
 use image::{GenericImageView, ImageBuffer, Rgba};
+use stopwatch::Stopwatch;
 
 fn main() {
     let palette = [
@@ -56,7 +57,9 @@ fn main() {
         );
     }
     let input = output.clone();
+    let stopwatch = Stopwatch::start_new();
     process_image(&mut state, &input, &mut output);
+    println!("processing took {:?}", stopwatch.elapsed());
 
     let mut imgbuf: ImageBuffer<Rgba<u8>, Vec<_>> =
         ImageBuffer::new(output.width as u32, output.height as u32);
