@@ -411,7 +411,7 @@ fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64
     sl = (col1.0 - col0.0) / (2.0 * sl);
     sc = (c2 - c1) / (1.0 * sc);
     sh = dh / sh;
-    f64::sqrt(sl.powf(2.0) + sc.powf(2.0) + sh.powf(2.0))
+    sl.powf(2.0) + sc.powf(2.0) + sh.powf(2.0)
 }
 
 fn color_to_ycc(color: &Color) -> Components {
