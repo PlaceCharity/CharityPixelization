@@ -355,7 +355,7 @@ fn ciede2000_color_dist2(c0: &Components, c1: &Components) -> f64
    let Cs_p2 = Cs_.powf(7.0);
    let RC = 2.0*f64::sqrt(Cs_p2/(Cs_p2+6103515625.0));
    let RT = -1.0*v.sin()*RC;
-   let SL = 1.0+(0.015*(L_-50.0)*(L_-50.0))/f64::sqrt(20.0+(L_-50.0)*(L_-50.0));
+   let SL = 1.0;
    let SC = 1.0+0.045*Cs_;
    let SH = 1.0+0.015*Cs_*T;
 
