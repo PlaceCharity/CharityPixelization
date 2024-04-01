@@ -1,4 +1,4 @@
-charity-pixelization
+# charity-pixelization
 
 a blazingly fast* pixelization library for charity
 
