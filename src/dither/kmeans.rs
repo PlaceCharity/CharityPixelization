@@ -62,20 +62,20 @@ pub(super) fn dither_kmeans(
             2,
         ),
         DitherMode::None | DitherMode::FloydDistributed | DitherMode::FloydComponent => {
-            dither_none_apply(state, input, &mut output.data)
+            dither_none_apply(state, input, &mut output.data);
         }
     }
 
     let temp = output.clone();
     let assignments = quant_compute_kmeans(state, &temp, 1);
 
-   for (col, assignment) in output.data.iter_mut().zip(assignments) {
+    for (col, assignment) in output.data.iter_mut().zip(assignments) {
         if col.alpha == 0 {
             continue;
         }
 
         *col = state.palette[assignment];
-   }
+    }
 }
 
 fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) -> Vec<usize> {
@@ -91,10 +91,16 @@ fn quant_compute_kmeans(state: &mut I2PState, data: &Sprite, pal_in: i32) -> Vec
     let threshold = 0.00005;
 
     loop {
-        quant_get_cluster_centroid(state, &quant_cluster_list, &mut quant_centroid_list, data, pal_in, 1 << state.palette_weight);
+        quant_get_cluster_centroid(
+            state,
+            &quant_cluster_list,
+            &mut quant_centroid_list,
+            data,
+            pal_in,
+            1 << state.palette_weight,
+        );
         quant_cluster_list.shrink_to(0);
-        quant_cluster_list
-            .resize(state.palette.len(), Default::default());
+        quant_cluster_list.resize(state.palette.len(), Vec::default());
         for i in 0..data.width * data.height {
             let color = data.data[i];
             quant_assignment[i] = quant_nearest_color_idx(color, &quant_centroid_list);
@@ -128,7 +134,10 @@ fn quant_colors_variance(color_list: &[Color]) -> f64 {
         })
         .sum();
 
-    dist_sum / length as f64
+    #[allow(clippy::cast_precision_loss)]
+    {
+        dist_sum / length as f64
+    }
 }
 
 fn quant_nearest_color_idx(color: Color, color_list: &[Color]) -> usize {
@@ -148,10 +157,10 @@ fn quant_nearest_color_idx(color: Color, color_list: &[Color]) -> usize {
 }
 
 fn quant_distance(color0: Color, color1: Color) -> f64 {
-    let mr = 0.5 * (color0.red as f64 + color1.red as f64);
-    let dr = color0.red as f64 - color1.red as f64;
-    let dg = color0.green as f64 - color1.green as f64;
-    let db = color0.blue as f64 - color1.blue as f64;
+    let mr = 0.5 * (f64::from(color0.red) + f64::from(color1.red));
+    let dr = f64::from(color0.red) - f64::from(color1.red);
+    let dg = f64::from(color0.green) - f64::from(color1.green);
+    let db = f64::from(color0.blue) - f64::from(color1.blue);
     let distance = (2.0 * dr * dr)
         + (4.0 * dg * dg)
         + (3.0 * db * db)
@@ -170,17 +179,11 @@ fn quant_get_cluster_centroid(
     for i in 0..state.palette.len() {
         if !quant_cluster_list[i].is_empty() {
             if pal_in != 0 {
-                quant_centroid_list[i] = quant_colors_mean(
-                    &quant_cluster_list[i],
-                    state.palette[i],
-                    palette_weight,
-                );
+                quant_centroid_list[i] =
+                    quant_colors_mean(&quant_cluster_list[i], state.palette[i], palette_weight);
             } else {
-                quant_centroid_list[i] = quant_colors_mean(
-                    &quant_cluster_list[i],
-                    Color::new(0, 0, 0, 0),
-                    0,
-                );
+                quant_centroid_list[i] =
+                    quant_colors_mean(&quant_cluster_list[i], Color::new(0, 0, 0, 0), 0);
             }
         } else if pal_in != 0 {
             quant_centroid_list[i] = state.palette[i];
@@ -204,9 +207,9 @@ fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) ->
     let mut b = 0;
 
     for color in color_list {
-        r += color.red as i32;
-        g += color.green as i32;
-        b += color.blue as i32;
+        r += i32::from(color.red);
+        g += i32::from(color.green);
+        b += i32::from(color.blue);
     }
 
     let mut weight_color = palette_weight;
@@ -214,9 +217,9 @@ fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) ->
         weight_color = color_list.len() as i32 / weight_color;
     }
     let length = color_list.len() as i32 + weight_color;
-    r += color.red as i32 * weight_color;
-    g += color.green as i32 * weight_color;
-    b += color.blue as i32 * weight_color;
+    r += i32::from(color.red) * weight_color;
+    g += i32::from(color.green) * weight_color;
+    b += i32::from(color.blue) * weight_color;
 
     if length != 0 {
         r /= length;
@@ -224,5 +227,6 @@ fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) ->
         b /= length;
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     Color::new(r as u8, g as u8, b as u8, 0)
 }

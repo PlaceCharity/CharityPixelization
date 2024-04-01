@@ -39,7 +39,10 @@ fn main() {
     let mut state = I2PState {
         pixel_distance_mode: charity_pixelization::DistanceMode::OKLab,
         pixel_dither_mode: charity_pixelization::DitherMode::Bayer8x8,
-        palette: &palette.iter().map(|c| c.parse().unwrap()).collect::<Vec<Color>>(),
+        palette: &palette
+            .iter()
+            .map(|c| c.parse().unwrap())
+            .collect::<Vec<Color>>(),
         ..Default::default()
     };
     let image = image::open("lenna.png").unwrap();

@@ -8,6 +8,7 @@ pub struct Sprite {
 }
 
 impl Sprite {
+    #[must_use]
     pub fn get_pixel(&self, x: usize, y: usize) -> Option<Color> {
         self.data.get(y * self.width + x).copied()
     }

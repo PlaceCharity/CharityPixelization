@@ -7,6 +7,9 @@ use crate::{Color, Components, I2PState, Sprite};
 
 use self::kmeans::dither_kmeans;
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 mod kmeans;
 
 const DITHER_THRESHOLD_BAYER8X8: [f32; 64] = [
@@ -181,7 +184,8 @@ const DITHER_THRESHOLD_CLUSTER4X4: [f32; 16] = [
 
 type DistanceFunction = dyn Fn(&[Color], &[Components], Color) -> Color + Sync;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum DitherMode {
     #[default]
     None,
@@ -194,7 +198,8 @@ pub enum DitherMode {
     FloydDistributed,
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum DistanceMode {
     #[default]
     KMeans,
@@ -396,7 +401,7 @@ fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64 {
     let c_ = (c1 + c2) / 2.0;
 
     let c_p2 = c_.powf(7.0);
-    let mut v = 0.5 * (1.0 - f64::sqrt(c_p2 / (c_p2 + 6103515625.0)));
+    let mut v = 0.5 * (1.0 - f64::sqrt(c_p2 / (c_p2 + 6_103_515_625.0)));
     let a1 = (1.0 + v) * col0.1;
     let a2 = (1.0 + v) * col1.1;
 
@@ -454,7 +459,7 @@ fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64 {
                 * ((h_ - 275.0_f64.to_radians()) / 25.0_f64.to_radians()),
         );
     let cs_p2 = cs_.powf(7.0);
-    let rc = 2.0 * f64::sqrt(cs_p2 / (cs_p2 + 6103515625.0));
+    let rc = 2.0 * f64::sqrt(cs_p2 / (cs_p2 + 6_103_515_625.0));
     let rt = -1.0 * v.sin() * rc;
     let sl = 1.0;
     let sc = 1.0 + 0.045 * cs_;
@@ -499,7 +504,7 @@ fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64 {
     let mut sl = if col0.0 < 16.0 {
         0.511
     } else {
-        (0.040975 * col0.0) / (1.0 + (0.01765 * col0.0))
+        (0.040_975 * col0.0) / (1.0 + (0.01765 * col0.0))
     };
 
     let mut sc = ((0.0638 * c1) / (1.0 + (0.0131 * c1))) + 0.638;
@@ -513,9 +518,9 @@ fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64 {
 }
 
 fn color_to_oklab(color: &Color) -> Components {
-    let r = color.red as f64 / 255.0;
-    let g = color.green as f64 / 255.0;
-    let b = color.blue as f64 / 255.0;
+    let r = f64::from(color.red) / 255.0;
+    let g = f64::from(color.green) / 255.0;
+    let b = f64::from(color.blue) / 255.0;
 
     let lr = if r >= 0.04045 {
         ((r + 0.055) / 1.055).powf(2.4)
@@ -533,25 +538,25 @@ fn color_to_oklab(color: &Color) -> Components {
         b / 12.92
     };
 
-    let l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
-    let m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
-    let s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+    let l = 0.412_221_470_8 * lr + 0.536_332_536_3 * lg + 0.051_445_992_9 * lb;
+    let m = 0.211_903_498_2 * lr + 0.680_699_545_1 * lg + 0.107_396_956_6 * lb;
+    let s = 0.088_302_461_9 * lr + 0.281_718_837_6 * lg + 0.629_978_700_5 * lb;
 
     let cbrt_l = l.cbrt();
     let cbrt_m = m.cbrt();
     let cbrt_s = s.cbrt();
 
     Components(
-        0.2104542553 * cbrt_l + 0.7936177850 * cbrt_m - 0.0040720468 * cbrt_s,
-        1.9779984951 * cbrt_l - 2.4285922050 * cbrt_m + 0.4505937099 * cbrt_s,
-        0.0259040371 * cbrt_l + 0.7827717662 * cbrt_m - 0.8086757660 * cbrt_s,
+        0.210_454_255_3 * cbrt_l + 0.793_617_785_0 * cbrt_m - 0.004_072_046_8 * cbrt_s,
+        1.977_998_495_1 * cbrt_l - 2.428_592_205_0 * cbrt_m + 0.450_593_709_9 * cbrt_s,
+        0.025_904_037_1 * cbrt_l + 0.782_771_766_2 * cbrt_m - 0.808_675_766_0 * cbrt_s,
     )
 }
 
 fn color_to_ycc(color: &Color) -> Components {
-    let r = color.red as f64;
-    let g = color.green as f64;
-    let b = color.blue as f64;
+    let r = f64::from(color.red);
+    let g = f64::from(color.green);
+    let b = f64::from(color.blue);
 
     Components(
         0.299 * r + 0.587 * g + 0.114 * b,
@@ -561,21 +566,21 @@ fn color_to_ycc(color: &Color) -> Components {
 }
 
 fn color_to_yiq(color: &Color) -> Components {
-    let r = color.red as f64;
-    let g = color.green as f64;
-    let b = color.blue as f64;
+    let r = f64::from(color.red);
+    let g = f64::from(color.green);
+    let b = f64::from(color.blue);
 
     Components(
         0.2999 * r + 0.587 * g + 0.114 * b,
-        0.595716 * r - 0.274453 * g - 0.321264 * b,
-        0.211456 * r - 0.522591 * g + 0.31135 * b,
+        0.595_716 * r - 0.274_453 * g - 0.321_264 * b,
+        0.211_456 * r - 0.522_591 * g + 0.31135 * b,
     )
 }
 
 fn color_to_yuv(color: &Color) -> Components {
-    let r = color.red as f64;
-    let g = color.green as f64;
-    let b = color.blue as f64;
+    let r = f64::from(color.red);
+    let g = f64::from(color.green);
+    let b = f64::from(color.blue);
 
     let c0 = 0.2999 * r + 0.587 * g + 0.114 * b;
     let c1 = 0.492 * (b - c0);
@@ -589,21 +594,21 @@ fn color_to_lab(color: &Color) -> Components {
     let mut xyz = color_to_xyz(color);
 
     //x component
-    if xyz.0 > 0.008856 {
+    if xyz.0 > 0.008_856 {
         xyz.0 = f64::powf(xyz.0, 1.0 / 3.0);
     } else {
         xyz.0 = (7.787 * xyz.0) + (16.0 / 116.0);
     }
 
     //y component
-    if xyz.1 > 0.008856 {
+    if xyz.1 > 0.008_856 {
         xyz.1 = f64::powf(xyz.1, 1.0 / 3.0);
     } else {
         xyz.1 = (7.787 * xyz.1) + (16.0 / 116.0);
     }
 
     //z component
-    if xyz.2 > 0.008856 {
+    if xyz.2 > 0.008_856 {
         xyz.2 = f64::powf(xyz.2, 1.0 / 3.0);
     } else {
         xyz.2 = (7.787 * xyz.2) + (16.0 / 116.0);
@@ -709,13 +714,13 @@ fn dither_threshold_apply(
             let threshold_id = ((y & r#mod) << dim) + (x & r#mod);
             let c = Color::new(
                 0x0.max(0xff.min(
-                    (input.red as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.red) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (input.green as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (input.blue as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 255,
             );
@@ -752,13 +757,13 @@ fn dither_threshold(
             let threshold_id = ((y & r#mod) << dim) + (x & r#mod);
             let c = Color::new(
                 0x0.max(0xff.min(
-                    (input.red as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.red) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (input.green as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (input.blue as f32 + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 255,
             );
@@ -766,4 +771,3 @@ fn dither_threshold(
         })
         .collect_into_vec(output);
 }
-
