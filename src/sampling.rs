@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
+// the sort of cast lints im allowing in this file are problems if we're dealing with massive images, which isn't going to happen
+
 use std::f64::consts::PI;
 
 use crate::{sprite::Sprite, Color, I2PState};
@@ -91,6 +99,7 @@ fn sample_ceil(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec
     output
 }
 
+#[allow(clippy::similar_names)]
 fn sample_linear(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec<Color> {
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f32 / width as f32;
@@ -133,6 +142,7 @@ fn sample_linear(s: &I2PState, input: &Sprite, width: usize, height: usize) -> V
     output
 }
 
+#[allow(clippy::too_many_lines, clippy::similar_names)]
 fn sample_bicubic(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec<Color> {
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f32 / width as f32;
@@ -146,7 +156,7 @@ fn sample_bicubic(s: &I2PState, input: &Sprite, width: usize, height: usize) -> 
             let six = ((x as f32 + f_off_x) * f_w) - ix as f32;
             let siy = ((y as f32 + f_off_y) * f_h) - iy as f32;
 
-            let mut c: Color = Default::default();
+            let mut c: Color = Color::default();
 
             let c00 = input
                 .get_pixel(
@@ -315,6 +325,7 @@ fn sample_bicubic(s: &I2PState, input: &Sprite, width: usize, height: usize) -> 
     output
 }
 
+#[allow(clippy::many_single_char_names)]
 fn cubic_hermite(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
     let a_ = -a / 2.0 + (3.0 * b) / 2.0 - (3.0 * c) / 2.0 + d / 2.0;
     let b_ = a - (5.0 * b) / 2.0 + 2.0 * c - d / 2.0;
@@ -324,6 +335,7 @@ fn cubic_hermite(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
     a_ * t * t * t + b_ * t * t + c_ * t + d_
 }
 
+#[allow(clippy::many_single_char_names)]
 fn sample_lanczos(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec<Color> {
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f64 / width as f64;
@@ -337,7 +349,7 @@ fn sample_lanczos(s: &I2PState, input: &Sprite, width: usize, height: usize) -> 
             let sx = ((x as f64 + f64::from(f_off_x)) * f_w) - ix as f64;
             let sy = ((y as f64 + f64::from(f_off_y)) * f_h) - iy as f64;
 
-            let mut c: Color = Default::default();
+            let mut c = Color::default();
 
             let a0 = lanczos(sx + 2.0);
             let a1 = lanczos(sx + 1.0);

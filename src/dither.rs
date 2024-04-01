@@ -1,3 +1,6 @@
+// because iterators use references, and i REFUSE to use closures
+#![allow(clippy::trivially_copy_pass_by_ref, clippy::module_name_repetitions)]
+
 use std::f64::consts::{PI, TAU};
 
 use ordered_float::OrderedFloat;
@@ -219,7 +222,7 @@ pub enum DistanceMode {
 
 pub fn dither_image(
     state: &mut I2PState,
-    input: Vec<Color>,
+    input: &[Color],
     output: &mut Sprite,
     width: usize,
     height: usize,
@@ -395,6 +398,7 @@ fn cie94_color_dist2(col0: &Components, col1: &Components) -> f64 {
     r1 * r1 + r2 * r2 + r3 * r3
 }
 
+#[allow(clippy::similar_names)]
 fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64 {
     let c1 = f64::sqrt(col0.1 * col0.1 + col0.2 * col0.2);
     let c2 = f64::sqrt(col1.1 * col1.1 + col1.2 * col1.2);
@@ -436,7 +440,6 @@ fn ciede2000_color_dist2(col0: &Components, col1: &Components) -> f64 {
     }
     let h = 2.0 * f64::sqrt(cs1 * cs2) * f64::sin(h / 2.0);
 
-    let _l_ = (col0.0 + col1.0) / 2.0;
     let cs_ = (cs1 + cs2) / 2.0;
     let mut h_ = h1 + h2;
     if cs1 * cs2 != 0.0 {
@@ -495,10 +498,10 @@ fn cmc_color_dist2(col0: &Components, col1: &Components) -> f64 {
         h1 = (col0.2 / col0.1).atan().to_degrees() + bias;
     }
 
-    let tt = if !(164.0..=345.0).contains(&h1) {
-        0.36 + f64::abs(0.4 * f64::cos(35.0 + h1))
-    } else {
+    let tt = if (164.0..=345.0).contains(&h1) {
         0.56 + f64::abs(0.2 * f64::cos(168.0 + h1))
+    } else {
+        0.36 + f64::abs(0.4 * f64::cos(35.0 + h1))
     };
 
     let mut sl = if col0.0 < 16.0 {
@@ -660,10 +663,10 @@ fn color_to_rgb(color: &Color) -> Components {
     )
 }
 
-fn dither_none_apply(state: &mut I2PState, input: Vec<Color>, output: &mut [Color]) {
+fn dither_none_apply(state: &mut I2PState, input: &[Color], output: &mut [Color]) {
     for (cin, output) in input.iter().zip(output) {
-        if cin.alpha < state.alpha_threshold as u8 {
-            *output = Default::default();
+        if cin.alpha < state.alpha_threshold {
+            *output = Color::default();
             continue;
         }
 
@@ -674,15 +677,15 @@ fn dither_none_apply(state: &mut I2PState, input: Vec<Color>, output: &mut [Colo
 
 fn dither_none(
     state: &I2PState,
-    input: Vec<Color>,
+    input: &[Color],
     output: &mut [Color],
     palette: &[Color],
     palette_components: &[Components],
     closest: impl Fn(&[Color], &[Components], Color) -> Color,
 ) {
     for (cin, output) in input.iter().zip(output) {
-        if cin.alpha < state.alpha_threshold as u8 {
-            *output = Default::default();
+        if cin.alpha < state.alpha_threshold {
+            *output = Color::default();
             continue;
         }
 
@@ -693,34 +696,37 @@ fn dither_none(
 
 fn dither_threshold_apply(
     state: &I2PState,
-    input: Vec<Color>,
+    input: &[Color],
     output: &mut [Color],
     width: usize,
     height: usize,
     threshold: &[f32],
     dim: u8,
 ) {
-    let amount = state.dither_amount as f32 / 1000.0;
+    let amount = state.dither_amount / 1000.0;
 
     for y in 0..height {
         for x in 0..width {
             let input = input[y * width + x];
-            if input.alpha < state.alpha_threshold as u8 {
-                output[y * width + x] = Default::default();
+            if input.alpha < state.alpha_threshold {
+                output[y * width + x] = Color::default();
                 continue;
             }
 
             let r#mod = (1 << dim) - 1;
             let threshold_id = ((y & r#mod) << dim) + (x & r#mod);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let c = Color::new(
                 0x0.max(0xff.min(
                     (f32::from(input.red) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5))
+                        as u8,
                 )),
                 0x0.max(0xff.min(
-                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5))
+                        as u8,
                 )),
                 255,
             );
@@ -732,7 +738,7 @@ fn dither_threshold_apply(
 #[allow(clippy::too_many_arguments)]
 fn dither_threshold(
     state: &I2PState,
-    input: Vec<Color>,
+    input: &[Color],
     output: &mut Vec<Color>,
     palette: &[Color],
     palette_components: &[Components],
@@ -741,7 +747,7 @@ fn dither_threshold(
     threshold: &[f32],
     dim: u8,
 ) {
-    let amount = state.dither_amount as f32 / 1000.0;
+    let amount = state.dither_amount / 1000.0;
 
     input
         .par_iter()
@@ -749,21 +755,24 @@ fn dither_threshold(
         .map(|(i, input)| {
             let x = i % width;
             let y = i / width;
-            if input.alpha < state.alpha_threshold as u8 {
-                return Default::default();
+            if input.alpha < state.alpha_threshold {
+                return Color::default();
             }
 
             let r#mod = (1 << dim) - 1;
             let threshold_id = ((y & r#mod) << dim) + (x & r#mod);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let c = Color::new(
                 0x0.max(0xff.min(
                     (f32::from(input.red) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
                 )),
                 0x0.max(0xff.min(
-                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.green) + 255.0 * amount * (threshold[threshold_id] - 0.5))
+                        as u8,
                 )),
                 0x0.max(0xff.min(
-                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5)) as u8,
+                    (f32::from(input.blue) + 255.0 * amount * (threshold[threshold_id] - 0.5))
+                        as u8,
                 )),
                 255,
             );

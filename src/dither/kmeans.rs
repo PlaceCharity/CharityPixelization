@@ -10,7 +10,7 @@ use super::{
 
 pub(super) fn dither_kmeans(
     state: &mut I2PState,
-    input: Vec<Color>,
+    input: &[Color],
     output: &mut Sprite,
     width: usize,
     height: usize,
@@ -201,6 +201,7 @@ fn quant_pick_random_color(data: &Sprite) -> Color {
         .unwrap_or_default()
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
 fn quant_colors_mean(color_list: &[Color], color: Color, palette_weight: i32) -> Color {
     let mut r = 0;
     let mut g = 0;

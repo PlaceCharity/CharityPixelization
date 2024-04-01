@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic)]
+#![allow(clippy::many_single_char_names)]
 
 use std::io::{BufWriter, Cursor};
 
@@ -28,8 +29,8 @@ pub struct I2PState<'a> {
     pub gamma: f64,
     pub saturation: f64,
     pub hue: f64,
-    pub dither_amount: i32,
-    pub alpha_threshold: i32,
+    pub dither_amount: f32,
+    pub alpha_threshold: u8,
     pub offset_x: i32,
     pub offset_y: i32,
     pub image_outline: Option<usize>,
@@ -43,16 +44,16 @@ pub struct I2PState<'a> {
     pub palette: &'a [Color],
 }
 
-
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy)]
 pub struct PixelizationOptions {
     pub brightness: Option<f64>,
     pub contrast: Option<f64>,
     pub gamma: Option<f64>,
     pub saturation: Option<f64>,
     pub hue: Option<f64>,
-    pub dither_amount: i32,
-    pub alpha_threshold: i32,
+    pub dither_amount: f32,
+    pub alpha_threshold: u8,
     pub offset_x: i32,
     pub offset_y: i32,
     pub image_outline: Option<usize>,
@@ -73,7 +74,7 @@ impl Default for I2PState<'_> {
             gamma: 100.0,
             saturation: 100.0,
             hue: 0.0,
-            dither_amount: 64,
+            dither_amount: 64.0,
             alpha_threshold: 128,
             offset_x: 0,
             offset_y: 0,
@@ -93,14 +94,40 @@ impl Default for I2PState<'_> {
 pub type Color = Rgba<Srgb, u8>;
 pub struct Components(f64, f64, f64);
 
+/// WASM-friendly wrapper for process_image.
+///
+/// # Panics
+///
+/// Panics if the output image can't be placed into an image buffer due to a dimension mismatch.
+///
+/// # Errors
+///
+/// This function will return an error if the provided palette cannot be parsed, the provided image cannot be loaded, or the result can't be packed into a PNG.
 #[cfg(feature = "wasm")]
 #[wasm_bindgen]
-pub fn process_image_wasm(input: &[u8], palette: Vec<String>, options: PixelizationOptions) -> Result<Vec<u8>, JsError> {
+pub fn process_image_wasm(
+    input: &[u8],
+    palette: Vec<String>,
+    options: PixelizationOptions,
+) -> Result<Vec<u8>, JsError> {
     let result = process_image(input, &palette, options);
     result.map_err(|e| JsError::new(&format!("{e}")))
 }
 
-pub fn process_image(input: &[u8], palette: &[String], options: PixelizationOptions) -> Result<Vec<u8>> {
+/// .
+///
+/// # Panics
+///
+/// Panics if the output image can't be placed into an image buffer due to a dimension mismatch.
+///
+/// # Errors
+///
+/// This function will return an error if the provided palette cannot be parsed, the provided image cannot be loaded, or the result can't be packed into a PNG.
+pub fn process_image(
+    input: &[u8],
+    palette: &[String],
+    options: PixelizationOptions,
+) -> Result<Vec<u8>> {
     let image = load_from_memory(input)?;
     let palette: Vec<Color> = palette
         .iter()
@@ -145,6 +172,7 @@ pub fn process_image(input: &[u8], palette: &[String], options: PixelizationOpti
     let input = output.clone();
     process_sprite(&mut state, &input, &mut output);
 
+    #[allow(clippy::cast_possible_truncation)]
     let mut imgbuf: ImageBuffer<image::Rgba<u8>, Vec<_>> =
         ImageBuffer::new(output.width as u32, output.height as u32);
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
@@ -169,6 +197,7 @@ pub fn process_image(input: &[u8], palette: &[String], options: PixelizationOpti
     Ok(output_image.into_inner())
 }
 
+#[allow(clippy::many_single_char_names)]
 pub fn process_sprite(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
     let mut temp = sample_image(s, input, output.width, output.height);
     let gamma_factor = s.gamma / 100.0;
@@ -237,7 +266,7 @@ pub fn process_sprite(s: &mut I2PState, input: &Sprite, output: &mut Sprite) {
         }
     }
 
-    dither_image(s, temp, output, output.width, output.height);
+    dither_image(s, &temp, output, output.width, output.height);
 
     post_process_image(s, output);
 }
