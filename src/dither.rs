@@ -204,7 +204,6 @@ pub enum DitherMode {
 #[derive(Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum DistanceMode {
-    #[default]
     KMeans,
     RGB,
     LWRGB,
@@ -217,6 +216,7 @@ pub enum DistanceMode {
     YCC,
     YIQ,
     YUV,
+    #[default]
     OKLab,
 }
 

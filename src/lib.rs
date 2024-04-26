@@ -66,6 +66,33 @@ pub struct PixelizationOptions {
     pub palette_weight: i32,
 }
 
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl PixelizationOptions {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> PixelizationOptions {
+        PixelizationOptions {
+            brightness: Some(0.0),
+            contrast: Some(0.0),
+            gamma: Some(100.0),
+            saturation: Some(100.0),
+            hue: Some(0.0),
+            dither_amount: 64.0,
+            alpha_threshold: 128,
+            offset_x: 0,
+            offset_y: 0,
+            image_outline: None,
+            image_inline: None,
+            pixel_sample_mode: SampleMode::default(),
+            pixel_dither_mode: DitherMode::default(),
+            pixel_distance_mode: DistanceMode::default(),
+            image_out_width: 128,
+            image_out_height: 128,
+            palette_weight: 2,
+        }
+    }
+}
+
 impl Default for I2PState<'_> {
     fn default() -> Self {
         Self {
