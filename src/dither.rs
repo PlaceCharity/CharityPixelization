@@ -10,7 +10,6 @@ use crate::{Color, Components, I2PState, Sprite};
 
 use self::kmeans::dither_kmeans;
 
-#[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 mod kmeans;
@@ -188,7 +187,7 @@ const DITHER_THRESHOLD_CLUSTER4X4: [f32; 16] = [
 type DistanceFunction = dyn Fn(&[Color], &[Components], Color) -> Color + Sync;
 
 #[derive(Default, Clone, Copy)]
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
 pub enum DitherMode {
     #[default]
     None,
@@ -202,7 +201,7 @@ pub enum DitherMode {
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
 pub enum DistanceMode {
     KMeans,
     RGB,

@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::many_single_char_names)]
 
-use std::io::{BufWriter, Cursor};
+use std::{borrow::Borrow, io::{BufWriter, Cursor}};
 
 use anyhow::Result;
 use dither::dither_image;
@@ -22,22 +22,27 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wasm")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
+#[derive(Clone)]
 pub struct I2PState {
     pub(crate) sample_options: SampleOptions,
     pub(crate) sample_step: Option<Vec<Color>>,
+
     pub(crate) pre_process_options: PreProcessOptions,
     pub(crate) pre_process_step: Option<Vec<Color>>,
     pub(crate) dither_options: DitherOptions,
+
     pub(crate) dither_step: Option<Sprite>,
     pub(crate) image_outline: Option<usize>,
     pub(crate) image_inline: Option<usize>,
     pub(crate) palette_weight: i32,
+
     pub(crate) palette: Vec<Color>,
+
     pub(crate) input: Sprite
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
 impl I2PState {
     pub fn dither_options(&mut self, options: DitherOptions) {
         self.dither_options = options;
@@ -57,9 +62,10 @@ impl I2PState {
         self.dither_step = None;
     }
 
-    pub fn palette(&mut self, palette: Vec<Color>) {
-        self.palette = palette;
+    pub fn palette(&mut self, palette: Vec<String>) -> Result<(), JsError> {
+        self.palette = palette.iter().map(|s| s.parse()).collect::<Result<Vec<_>, FromHexError>>().map_err(|e| JsError::from(e))?;
         self.dither_step = None;
+        Ok(())
     }
 
     pub fn image(&mut self) -> Result<Vec<u8>, JsError> {
@@ -92,6 +98,8 @@ impl I2PState {
     }
 }
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct DitherOptions {
     pub dither_amount: f32,
     pub alpha_threshold: u8,
@@ -106,6 +114,8 @@ impl Default for DitherOptions {
     }
 }
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct PreProcessOptions {
     pub brightness: f64,
     pub contrast: f64,
@@ -114,13 +124,15 @@ pub struct PreProcessOptions {
     pub hue: f64
 }
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct SampleOptions {
     pub sample_mode: SampleMode,
     pub offset_x: i32,
     pub offset_y: i32,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct PixelizationOptions {
     pub brightness: Option<f64>,
@@ -142,7 +154,6 @@ pub struct PixelizationOptions {
     pub palette_weight: i32,
 }
 
-#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl PixelizationOptions {
     #[wasm_bindgen(constructor)]
@@ -205,6 +216,26 @@ impl Default for I2PState {
 pub type Color = Rgba<Srgb, u8>;
 pub struct Components(f64, f64, f64);
 
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ProcessOutput {
+    image: Vec<u8>,
+    state: I2PState
+}
+
+#[wasm_bindgen]
+impl ProcessOutput {
+    #[wasm_bindgen(getter)]
+    pub fn image(&self) -> Vec<u8> {
+        self.image.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn state(&self) -> I2PState {
+        self.state.clone()
+    }
+}
+
 /// WASM-friendly wrapper for process_image.
 ///
 /// # Panics
@@ -214,13 +245,12 @@ pub struct Components(f64, f64, f64);
 /// # Errors
 ///
 /// This function will return an error if the provided palette cannot be parsed, the provided image cannot be loaded, or the result can't be packed into a PNG.
-#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 pub fn process_image_wasm(
     input: &[u8],
     palette: Vec<String>,
     options: PixelizationOptions,
-) -> Result<(Vec<u8>, I2PState), JsError> {
+) -> Result<ProcessOutput, JsError> {
     let result = process_image(input, &palette, options);
     result.map_err(|e| JsError::new(&format!("{e}")))
 }
@@ -238,7 +268,7 @@ pub fn process_image(
     input: &[u8],
     palette: &[String],
     options: PixelizationOptions,
-) -> Result<(Vec<u8>, I2PState)> {
+) -> Result<ProcessOutput> {
     let image = load_from_memory(input)?;
     let palette: Vec<Color> = palette
         .iter()
@@ -309,7 +339,7 @@ pub fn process_image(
         ColorType::Rgba8,
         image::ImageFormat::Png,
     )?;
-    Ok((output_image.into_inner(), state))
+    Ok(ProcessOutput { image: output_image.into_inner(), state})
 }
 
 #[allow(clippy::many_single_char_names)]

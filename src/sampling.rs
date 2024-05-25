@@ -10,11 +10,10 @@ use std::f64::consts::PI;
 
 use crate::{sprite::Sprite, Color, I2PState};
 
-#[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 #[derive(Default, Clone, Copy)]
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[wasm_bindgen]
 pub enum SampleMode {
     #[default]
     Round,
