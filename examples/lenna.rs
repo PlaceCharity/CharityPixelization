@@ -1,4 +1,4 @@
-use charity_pixelization::{process_sprite, Color, I2PState, Sprite};
+use charity_pixelization::{process_sprite, Color, DitherOptions, I2PState, Sprite};
 use image::{GenericImageView, ImageBuffer, Rgba};
 
 fn main() {
@@ -36,15 +36,16 @@ fn main() {
         "#D4D7D9FF",
         "#FFFFFFFF",
     ];
-    let mut state = I2PState {
+    let mut state = I2PState::default();
+    state.dither_options(DitherOptions {
         pixel_distance_mode: charity_pixelization::DistanceMode::OKLab,
         pixel_dither_mode: charity_pixelization::DitherMode::Bayer8x8,
-        palette: &palette
-            .iter()
-            .map(|c| c.parse().unwrap())
-            .collect::<Vec<Color>>(),
         ..Default::default()
-    };
+    });
+    state.palette(palette
+        .iter()
+        .map(|c| c.parse().unwrap())
+        .collect());
     let image = image::open("lenna.png").unwrap();
     let mut output = Sprite {
         width: image.width() as usize,
@@ -60,6 +61,7 @@ fn main() {
         );
     }
     let input = output.clone();
+    process_sprite(&mut state, &input, &mut output);
     process_sprite(&mut state, &input, &mut output);
 
     let mut imgbuf: ImageBuffer<Rgba<u8>, Vec<_>> =

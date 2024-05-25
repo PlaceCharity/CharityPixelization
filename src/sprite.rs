@@ -1,6 +1,6 @@
 use crate::Color;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Sprite {
     pub width: usize,
     pub height: usize,

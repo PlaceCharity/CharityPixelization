@@ -1,4 +1,4 @@
-use charity_pixelization::{process_sprite, Color, I2PState, Sprite};
+use charity_pixelization::{process_sprite, Color, DitherOptions, I2PState, Sprite};
 use image::{GenericImageView, ImageBuffer, Rgba};
 
 fn main() {
@@ -36,16 +36,17 @@ fn main() {
         "#D4D7D9FF",
         "#FFFFFFFF",
     ];
-    let mut state = I2PState {
+    let mut state = I2PState::default();
+    state.dither_options(DitherOptions {
         pixel_distance_mode: charity_pixelization::DistanceMode::Redmean,
         pixel_dither_mode: charity_pixelization::DitherMode::None,
         dither_amount: 512.0,
-        palette: &palette
-            .iter()
-            .map(|c| c.parse().unwrap())
-            .collect::<Vec<Color>>(),
         ..Default::default()
-    };
+    });
+    state.palette(palette
+        .iter()
+        .map(|c| c.parse().unwrap())
+        .collect());
     let image = image::open("hsl.png").unwrap();
     let mut output = Sprite {
         width: image.width() as usize,

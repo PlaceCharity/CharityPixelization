@@ -227,12 +227,12 @@ pub fn dither_image(
     width: usize,
     height: usize,
 ) {
-    if state.pixel_distance_mode == DistanceMode::KMeans {
+    if state.dither_options.pixel_distance_mode == DistanceMode::KMeans {
         dither_kmeans(state, input, output, width, height);
         return;
     }
 
-    let palette_components: Vec<Components> = match state.pixel_distance_mode {
+    let palette_components: Vec<Components> = match state.dither_options.pixel_distance_mode {
         DistanceMode::RGB | DistanceMode::LWRGB | DistanceMode::Redmean => {
             state.palette.iter().map(color_to_rgb).collect()
         }
@@ -247,7 +247,7 @@ pub fn dither_image(
         DistanceMode::KMeans => unreachable!(),
     };
 
-    let find_closest = match state.pixel_distance_mode {
+    let find_closest = match state.dither_options.pixel_distance_mode {
         DistanceMode::RGB => palette_find_closest(color_to_rgb, color_dist2),
         DistanceMode::LWRGB => palette_find_closest(color_to_rgb, lwrgb_color_dist2),
         DistanceMode::Redmean => palette_find_closest(color_to_rgb, redmean_color_dist2),
@@ -263,12 +263,12 @@ pub fn dither_image(
         DistanceMode::KMeans => unreachable!(),
     };
 
-    match state.pixel_dither_mode {
+    match state.dither_options.pixel_dither_mode {
         DitherMode::None => dither_none(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
         ),
@@ -276,7 +276,7 @@ pub fn dither_image(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
             width,
@@ -287,7 +287,7 @@ pub fn dither_image(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
             width,
@@ -298,7 +298,7 @@ pub fn dither_image(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
             width,
@@ -309,7 +309,7 @@ pub fn dither_image(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
             width,
@@ -320,7 +320,7 @@ pub fn dither_image(
             state,
             input,
             &mut output.data,
-            state.palette,
+            &state.palette,
             &palette_components,
             find_closest,
             width,
@@ -665,7 +665,7 @@ fn color_to_rgb(color: &Color) -> Components {
 
 fn dither_none_apply(state: &mut I2PState, input: &[Color], output: &mut [Color]) {
     for (cin, output) in input.iter().zip(output) {
-        if cin.alpha < state.alpha_threshold {
+        if cin.alpha < state.dither_options.alpha_threshold {
             *output = Color::default();
             continue;
         }
@@ -684,7 +684,7 @@ fn dither_none(
     closest: impl Fn(&[Color], &[Components], Color) -> Color,
 ) {
     for (cin, output) in input.iter().zip(output) {
-        if cin.alpha < state.alpha_threshold {
+        if cin.alpha < state.dither_options.alpha_threshold {
             *output = Color::default();
             continue;
         }
@@ -703,12 +703,12 @@ fn dither_threshold_apply(
     threshold: &[f32],
     dim: u8,
 ) {
-    let amount = state.dither_amount / 1000.0;
+    let amount = state.dither_options.dither_amount / 1000.0;
 
     for y in 0..height {
         for x in 0..width {
             let input = input[y * width + x];
-            if input.alpha < state.alpha_threshold {
+            if input.alpha < state.dither_options.alpha_threshold {
                 output[y * width + x] = Color::default();
                 continue;
             }
@@ -747,7 +747,7 @@ fn dither_threshold(
     threshold: &[f32],
     dim: u8,
 ) {
-    let amount = state.dither_amount / 1000.0;
+    let amount = state.dither_options.dither_amount / 1000.0;
 
     input
         .par_iter()
@@ -755,7 +755,7 @@ fn dither_threshold(
         .map(|(i, input)| {
             let x = i % width;
             let y = i / width;
-            if input.alpha < state.alpha_threshold {
+            if input.alpha < state.dither_options.alpha_threshold {
                 return Color::default();
             }
 

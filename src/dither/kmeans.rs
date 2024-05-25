@@ -15,7 +15,7 @@ pub(super) fn dither_kmeans(
     width: usize,
     height: usize,
 ) {
-    match state.pixel_dither_mode {
+    match state.dither_options.pixel_dither_mode {
         DitherMode::Bayer8x8 => dither_threshold_apply(
             state,
             input,

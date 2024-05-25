@@ -26,7 +26,7 @@ pub enum SampleMode {
 }
 
 pub fn sample_image(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec<Color> {
-    match s.pixel_sample_mode {
+    match s.sample_options.sample_mode {
         SampleMode::Round => sample_round(s, input, width, height),
         SampleMode::Floor => sample_floor(s, input, width, height),
         SampleMode::Ceiling => sample_ceil(s, input, width, height),
@@ -40,8 +40,8 @@ fn sample_round(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Ve
     let mut output = Vec::with_capacity(width * height);
     let w = (input.width - 1) as f64 / width as f64;
     let h = (input.height - 1) as f64 / height as f64;
-    let off_x = f64::from(s.offset_x) / 100.0;
-    let off_y = f64::from(s.offset_y) / 100.0;
+    let off_x = f64::from(s.sample_options.offset_x) / 100.0;
+    let off_y = f64::from(s.sample_options.offset_y) / 100.0;
     for y in 0..height {
         for x in 0..width {
             let dx = x as f64 + off_x;
@@ -61,8 +61,8 @@ fn sample_floor(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Ve
     let mut output = Vec::with_capacity(width * height);
     let w = (input.width - 1) as f64 / width as f64;
     let h = (input.height - 1) as f64 / height as f64;
-    let off_x = f64::from(s.offset_x) / 100.0;
-    let off_y = f64::from(s.offset_y) / 100.0;
+    let off_x = f64::from(s.sample_options.offset_x) / 100.0;
+    let off_y = f64::from(s.sample_options.offset_y) / 100.0;
     for y in 0..height {
         for x in 0..width {
             let dx = x as f64 + off_x;
@@ -82,8 +82,8 @@ fn sample_ceil(s: &I2PState, input: &Sprite, width: usize, height: usize) -> Vec
     let mut output = Vec::with_capacity(width * height);
     let w = (input.width - 1) as f64 / width as f64;
     let h = (input.height - 1) as f64 / height as f64;
-    let off_x = f64::from(s.offset_x) / 100.0;
-    let off_y = f64::from(s.offset_y) / 100.0;
+    let off_x = f64::from(s.sample_options.offset_x) / 100.0;
+    let off_y = f64::from(s.sample_options.offset_y) / 100.0;
     for y in 0..height {
         for x in 0..width {
             let dx = x as f64 + off_x;
@@ -104,8 +104,8 @@ fn sample_linear(s: &I2PState, input: &Sprite, width: usize, height: usize) -> V
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f32 / width as f32;
     let f_h = (input.height - 1) as f32 / height as f32;
-    let f_off_x = s.offset_x as f32 / 100.0;
-    let f_off_y = s.offset_y as f32 / 100.0;
+    let f_off_x = s.sample_options.offset_x as f32 / 100.0;
+    let f_off_y = s.sample_options.offset_y as f32 / 100.0;
     for y in 0..height {
         for x in 0..width {
             let ix = ((x as f32 + f_off_x) * f_w) as usize;
@@ -147,8 +147,8 @@ fn sample_bicubic(s: &I2PState, input: &Sprite, width: usize, height: usize) -> 
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f32 / width as f32;
     let f_h = (input.height - 1) as f32 / height as f32;
-    let f_off_x = s.offset_x as f32 / 100.0;
-    let f_off_y = s.offset_y as f32 / 100.0;
+    let f_off_x = s.sample_options.offset_x as f32 / 100.0;
+    let f_off_y = s.sample_options.offset_y as f32 / 100.0;
     for y in 0..height {
         for x in 0..width {
             let ix = ((x as f32 + f_off_x) * f_w) as usize;
@@ -340,8 +340,8 @@ fn sample_lanczos(s: &I2PState, input: &Sprite, width: usize, height: usize) -> 
     let mut output = Vec::with_capacity(width * height);
     let f_w = (input.width - 1) as f64 / width as f64;
     let f_h = (input.height - 1) as f64 / height as f64;
-    let f_off_x = s.offset_x as f32 / 100.0;
-    let f_off_y = s.offset_y as f32 / 100.0;
+    let f_off_x = s.sample_options.offset_x as f32 / 100.0;
+    let f_off_y = s.sample_options.offset_y as f32 / 100.0;
     for y in 0..height {
         for x in 0..width {
             let ix = ((x as f64 + f64::from(f_off_x)) * f_w) as usize;
